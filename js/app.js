@@ -1,6 +1,6 @@
-import { delegate, getURLHash, insertHTML, replaceHTML } from "./helpers.js";
-import { TodoStore } from "./store.js";
-import { uuid } from 'https://edge.js.m-ld.org/ext/index.mjs';
+import {delegate, getURLHash, insertHTML, replaceHTML} from "./helpers.js";
+import {TodoStore} from "./store.js";
+import {uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
 
 const App = {
 	$: {
@@ -42,8 +42,44 @@ const App = {
 			`
 			);
 		},
+		getTodo(liOrId) {
+			let $li = liOrId instanceof Element ? liOrId :
+				document.querySelector(`[data-id="${liOrId}"]`);
+			if ($li != null) {
+				return {
+					$li,
+					get $input() {
+						return $li.querySelector('[data-todo="edit"]')
+					},
+					get $label() {
+						return $li.querySelector('[data-todo="label"]')
+					}
+				}
+			}
+		},
+		getEditing() {
+			const $li = document.querySelector('.editing');
+			if ($li != null) {
+				const editingId = $li.dataset.id;
+				const $input = App.$.getTodo($li).$input;
+				const selection = [$input.selectionStart, $input.selectionEnd];
+				return {
+					id: editingId,
+					restore() { return App.$.setEditing(editingId, ...selection); }
+				}
+			}
+		},
+		setEditing(liOrId, selectionStart, selectionEnd) {
+			let $todo = App.$.getTodo(liOrId);
+			if ($todo != null) {
+				$todo.$li.classList.add("editing");
+				$todo.$input.focus();
+				$todo.$input.setSelectionRange(selectionStart, selectionEnd);
+				return $todo;
+			}
+		}
 	},
-	async init() {
+	init() {
 		function onHashChange() {
 			let {todosId, filter} = getURLHash(document.location.hash);
 			const isNew = !todosId;
@@ -86,11 +122,10 @@ const App = {
 		App.todoEvent("click", '[data-todo="destroy"]', (todo) => App.todos.remove(todo));
 		App.todoEvent("click", '[data-todo="toggle"]', (todo) => App.todos.toggle(todo));
 		App.todoEvent("dblclick", '[data-todo="label"]', (_, $li) => {
-			$li.classList.add("editing");
-			$li.querySelector('[data-todo="edit"]').focus();
+			App.$.setEditing($li);
 		});
 		App.todoEvent("keyup", '[data-todo="edit"]', (todo, $li, e) => {
-			let $input = $li.querySelector('[data-todo="edit"]');
+			let $input = App.$.getTodo($li).$input;
 			if (e.key === "Enter" && $input.value) {
 				$li.classList.remove("editing");
 				App.todos.update({ ...todo, title: $input.value });
@@ -122,11 +157,12 @@ const App = {
 			<input class="edit" data-todo="edit">
 		`
 		);
-		li.querySelector('[data-todo="label"]').textContent = todo.title;
-		li.querySelector('[data-todo="edit"]').value = todo.title;
+		App.$.getTodo(li).$label.textContent = todo.title;
+		App.$.getTodo(li).$input.value = todo.title;
 		return li;
 	},
-	render() {
+	render(saveEvent) {
+		const editing = saveEvent && App.$.getEditing();
 		const count = App.todos.all().length;
 		App.$.setActiveFilter(App.filter);
 		App.$.list.replaceChildren(...App.todos.all(App.filter).map((todo) => App.createTodoItem(todo)));
@@ -136,6 +172,7 @@ const App = {
 		App.$.toggleAll.checked = App.todos.isAllCompleted();
 		App.$.displayCount(App.todos.all("active").length);
 		App.$.input.disabled = false;
+		editing?.restore(); // TODO: What if no longer present (filtered out or removed)
 	},
 	error(errEvent) {
 		replaceHTML(document.querySelector('.todoapp'), `
@@ -147,4 +184,4 @@ const App = {
 	}
 };
 
-await App.init();
+App.init();

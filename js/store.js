@@ -9,10 +9,7 @@ import {IoRemotes} from 'https://edge.js.m-ld.org/ext/socket.io.mjs';
  * @property {boolean} completed
  */
 
-/**
- * Singleton API for current Todos
- * @type {TodoStore}
- */
+/** Store API for current Todos */
 export class TodoStore extends EventTarget {
 	constructor(todosId, isNew) {
 		super();
@@ -46,7 +43,7 @@ export class TodoStore extends EventTarget {
 			'@id': uuid(),
 			'@domain': `${this.id}.todomvc.m-ld.org`,
 			genesis: isNew,
-			io: {uri: 'http://localhost:3001'}
+			io: {uri: `http://${window.location.hostname}:3001`}
 		}).then(async meld => {
 			this.meld = meld;
 			await meld.status.becomes({ outdated: false });
