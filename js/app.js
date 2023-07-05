@@ -62,10 +62,31 @@ const App = {
 			if ($li != null) {
 				const editingId = $li.dataset.id;
 				const $input = App.$.getTodo($li).$input;
-				const selection = [$input.selectionStart, $input.selectionEnd];
+				const selection = {
+					start: $input.selectionStart, end: $input.selectionEnd
+				};
 				return {
 					id: editingId,
-					restore() { return App.$.setEditing(editingId, ...selection); }
+					restore(saveEvent) {
+						if (!saveEvent.detail.isEcho) {
+							// Check whether the active to-do has been spliced
+							for (let matchingExpr of [].concat(
+								saveEvent.detail.update['@update']
+									.find(todo => todo['@id'] === editingId)?.title
+							)) {
+								// If so, we need to adjust the caret and
+								// selection based on the updates made
+								const [index, deleteCount, content] = matchingExpr?.['@splice'] ?? [];
+								if (index < selection.start) {
+									selection.start += content.length - deleteCount;
+								}
+								if (index < selection.end) {
+									selection.end += content.length - deleteCount;
+								}
+							}
+						}
+						return App.$.setEditing(editingId, selection.start, selection.end);
+					}
 				}
 			}
 		},
@@ -125,19 +146,17 @@ const App = {
 			App.$.setEditing($li);
 		});
 		App.todoEvent("keyup", '[data-todo="edit"]', (todo, $li, e) => {
-			let $input = App.$.getTodo($li).$input;
-			if (e.key === "Enter" && $input.value) {
+			if (e.key === "Enter" || e.key === "Escape") {
 				$li.classList.remove("editing");
-				App.todos.update({ ...todo, title: $input.value });
-			}
-			if (e.key === "Escape") {
-				document.activeElement.blur();
 			}
 		});
+		App.todoEvent("input", '[data-todo="edit"]', (todo, $li) => {
+			let $input = App.$.getTodo($li).$input;
+			App.todos.update({ ...todo, title: $input.value });
+		});
+		// Comment out this block to test multiple clones on the same machine
 		App.todoEvent("focusout", '[data-todo="edit"]', (todo, $li) => {
-			if ($li.classList.contains("editing")) {
-				App.render();
-			}
+			$li.classList.remove("editing");
 		});
 	},
 	createTodoItem(todo) {
@@ -172,7 +191,7 @@ const App = {
 		App.$.toggleAll.checked = App.todos.isAllCompleted();
 		App.$.displayCount(App.todos.all("active").length);
 		App.$.input.disabled = false;
-		editing?.restore(); // TODO: What if no longer present (filtered out or removed)
+		editing?.restore(saveEvent); // TODO: What if no longer present (filtered out or removed)
 	},
 	error(errEvent) {
 		replaceHTML(document.querySelector('.todoapp'), `

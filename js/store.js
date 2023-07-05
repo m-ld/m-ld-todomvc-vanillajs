@@ -1,6 +1,7 @@
-import {clone, isReference, updateSubject, uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
+import {clone, isReference, updateSubject, uuid, textDiff} from 'https://edge.js.m-ld.org/ext/index.mjs';
 import {MemoryLevel} from 'https://edge.js.m-ld.org/ext/memory-level.mjs';
 import {IoRemotes} from 'https://edge.js.m-ld.org/ext/socket.io.mjs';
+import {TSeqText} from 'https://edge.js.m-ld.org/ext/tseq.mjs';
 
 /**
  * @typedef {object} Todo
@@ -25,26 +26,31 @@ export class TodoStore extends EventTarget {
 				: filter === "completed"
 				? this.todos.filter((todo) => todo.completed)
 				: this.todos;
+		this._updating = false;
 	}
 	_handleError = (error) => {
 		this.dispatchEvent(new ErrorEvent('error', {error}));
 	};
 	_readStorage(isNew) {
 		this.todos = [];
-		const loadTodoReferences = async (state) => {
+		const loadTodoReferences = async (state, update) => {
 			await Promise.all(this.todos.map(async (todo, i) => {
 				if (isReference(todo))
 					this.todos[i] = await state.get(todo['@id']);
 			}));
 			console.log(this.todos);
-			this.dispatchEvent(new CustomEvent("save"));
+			this.dispatchEvent(new CustomEvent("save", {
+				// We include the actual update made as a detail of the save
+				// event so that the app can adjust the caret and selection
+				detail: {update, isEcho: this._updating}
+			}));
 		};
 		clone(new MemoryLevel, IoRemotes, {
 			'@id': uuid(),
 			'@domain': `${this.id}.todomvc.m-ld.org`,
 			genesis: isNew,
-			io: {uri: `http://${window.location.hostname}:3001`}
-		}).then(async meld => {
+			io: {uri: `http://${window.location.hostname}:3001`},
+		}, new TSeqText('title')).then(async meld => {
 			this.meld = meld;
 			await meld.status.becomes({ outdated: false });
 			meld.read(async state => {
@@ -52,12 +58,20 @@ export class TodoStore extends EventTarget {
 				await loadTodoReferences(state);
 			}, async (update, state) => {
 				updateSubject({'@id': 'todos', '@list': this.todos}, update);
-				await loadTodoReferences(state);
+				await loadTodoReferences(state, update);
 			});
 		}).catch(this._handleError);
 	}
 	_save(write) {
-		this.meld.write(write).catch(this._handleError);
+		this.meld.write(async (state) => {
+			// This allows us to tell the app whether an update is an echo
+			this._updating = true;
+			try {
+				await state.write(write);
+			} finally {
+				this._updating = false;
+			}
+		}).catch(this._handleError);
 	}
 	// MUTATE methods
 	add({ title }) {
@@ -95,9 +109,12 @@ export class TodoStore extends EventTarget {
 		});
 	}
 	update({ '@id': id, title }) {
-		this._save({
-			'@update': {'@id': id, title}
-		});
+		// The textDiff utility generates splices from a whole-text comparison
+		for (let splice of textDiff(this.get(id).title, title)) {
+			this._save({
+				'@update': {'@id': id, title: {'@splice': splice}}
+			});
+		}
 	}
 	toggleAll() {
 		const completed = !this.hasCompleted() || !this.isAllCompleted();
