@@ -66,7 +66,7 @@ const App = {
 				return {
 					id: editingId,
 					restore(saveEvent) {
-						if (!saveEvent.detail.isEcho) {
+						if (saveEvent.detail != null && !saveEvent.detail.isEcho) {
 							// Check whether the active to-do has been spliced
 							for (let matchingExpr of [].concat(
 								saveEvent.detail.update['@update']

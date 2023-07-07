@@ -35,7 +35,7 @@ export class TodoStore extends EventTarget {
 		this.todos = [];
 		// This loads any new to-do details from plain references
 		// TODO: This will improve with the use of a reactive observable query
-		function loadTodoReferences(todos, state, update) {
+		function loadTodoReferences(todos, state) {
 			return Promise.all(todos.map(async (todo, i) => {
 				if (isReference(todo))
 					todos[i] = await state.get(todo['@id']);
@@ -52,14 +52,10 @@ export class TodoStore extends EventTarget {
 			meld.read(async state => {
 				this.todos = (await state.get('todos'))?.['@list'] ?? [];
 				await loadTodoReferences(this.todos, state);
-				this.dispatchEvent(new CustomEvent("save", {
-					// We include the actual update made as a detail of the save
-					// event so that the app can adjust the caret and selection
-					detail: {update, isEcho: this._updating}
-				}));
+				this.dispatchEvent(new CustomEvent("save"));
 			}, async (update, state) => {
 				updateSubject({'@id': 'todos', '@list': this.todos}, update);
-				await loadTodoReferences(this.todos, state, update);
+				await loadTodoReferences(this.todos, state);
 				this.dispatchEvent(new CustomEvent("save", {
 					// We include the actual update made as a detail of the save
 					// event so that the app can adjust the caret and selection
