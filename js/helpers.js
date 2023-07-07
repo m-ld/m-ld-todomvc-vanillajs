@@ -1,4 +1,7 @@
-export const getURLHash = () => document.location.hash.replace(/^#\//, "");
+export const getURLHash = (hash) => {
+	const [documentId, filter] = hash.split('/').slice(1); // Remove hash symbol
+	return {documentId: documentId ?? '', filter: filter ?? ''};
+};
 
 export const delegate = (el, selector, event, handler) => {
 	el.addEventListener(event, (e) => {
