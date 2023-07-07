@@ -1,6 +1,6 @@
 export const getURLHash = (hash) => {
-	const [todosId, filter] = hash.split('/').slice(1); // Remove hash symbol
-	return {todosId: todosId ?? '', filter: filter ?? ''};
+	const [documentId, filter] = hash.split('/').slice(1); // Remove hash symbol
+	return {documentId: documentId ?? '', filter: filter ?? ''};
 };
 
 export const delegate = (el, selector, event, handler) => {
