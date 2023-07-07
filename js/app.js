@@ -26,7 +26,7 @@ const App = {
 		},
 		setActiveFilter(filter) {
 			App.$.filters.forEach((el) => {
-				if (el.matches(`[href="#/${filter}"]`)) {
+				if (el.matches(`[href="#/${App.todos.id}/${filter}"]`)) {
 					el.classList.add("selected");
 				} else {
 					el.classList.remove("selected");
@@ -45,17 +45,15 @@ const App = {
 		getTodo(liOrId) {
 			let $li = liOrId instanceof Element ? liOrId :
 				document.querySelector(`[data-id="${liOrId}"]`);
-			if ($li != null) {
-				return {
-					$li,
-					get $input() {
-						return $li.querySelector('[data-todo="edit"]')
-					},
-					get $label() {
-						return $li.querySelector('[data-todo="label"]')
-					}
+			return $li && {
+				$li,
+				get $input() {
+					return $li.querySelector('[data-todo="edit"]')
+				},
+				get $label() {
+					return $li.querySelector('[data-todo="label"]')
 				}
-			}
+			};
 		},
 		getEditing() {
 			const $li = document.querySelector('.editing');
@@ -81,20 +79,23 @@ const App = {
 	},
 	init() {
 		function onHashChange() {
-			let {todosId, filter} = getURLHash(document.location.hash);
-			const isNew = !todosId;
+			let {documentId, filter} = getURLHash(document.location.hash);
+			const isNew = !documentId;
 			if (isNew) {
-				todosId = uuid();
-				history.pushState(null, null, `#/${todosId}/${filter}`);
+				documentId = uuid();
+				history.pushState(null, null, `#/${documentId}/${filter}`);
 			}
-			if (App.todos == null || App.todos.id !== todosId) {
+			App.filter = filter;
+			if (App.todos == null || App.todos.id !== documentId) {
 				App.todos?.close();
-				App.todos = new TodoStore(todosId, isNew);
+				App.todos = new TodoStore(documentId, isNew);
 				App.$.updateFilterHashes();
 				App.todos.addEventListener("save", App.render);
 				App.todos.addEventListener("error", App.error);
+			} else {
+				App.$.setActiveFilter(App.filter);
+				App.render();
 			}
-			App.filter = filter;
 		}
 		window.addEventListener("hashchange", onHashChange);
 		onHashChange();

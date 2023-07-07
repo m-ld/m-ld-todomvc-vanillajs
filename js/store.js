@@ -31,14 +31,14 @@ export class TodoStore extends EventTarget {
 	};
 	_readStorage(isNew) {
 		this.todos = [];
-		const loadTodoReferences = async (state) => {
-			await Promise.all(this.todos.map(async (todo, i) => {
+		// This loads any new to-do details from plain references
+		// TODO: This will improve with the use of a reactive observable query
+		function loadTodoReferences(todos, state) {
+			return Promise.all(todos.map(async (todo, i) => {
 				if (isReference(todo))
-					this.todos[i] = await state.get(todo['@id']);
+					todos[i] = await state.get(todo['@id']);
 			}));
-			console.log(this.todos);
-			this.dispatchEvent(new CustomEvent("save"));
-		};
+		}
 		clone(new MemoryLevel, IoRemotes, {
 			'@id': uuid(),
 			'@domain': `${this.id}.todomvc.m-ld.org`,
@@ -49,10 +49,12 @@ export class TodoStore extends EventTarget {
 			await meld.status.becomes({ outdated: false });
 			meld.read(async state => {
 				this.todos = (await state.get('todos'))?.['@list'] ?? [];
-				await loadTodoReferences(state);
+				await loadTodoReferences(this.todos, state);
+				this.dispatchEvent(new CustomEvent("save"));
 			}, async (update, state) => {
 				updateSubject({'@id': 'todos', '@list': this.todos}, update);
-				await loadTodoReferences(state);
+				await loadTodoReferences(this.todos, state);
+				this.dispatchEvent(new CustomEvent("save"));
 			});
 		}).catch(this._handleError);
 	}

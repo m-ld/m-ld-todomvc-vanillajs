@@ -81,7 +81,7 @@ body {
 
 .todoapp a {
     all: unset;
-	cursor: pointer;
+    cursor: pointer;
 }
 
 .new-todo,
