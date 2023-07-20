@@ -9,12 +9,8 @@ This is a [vanilla Javascript implementation of TodoMVC](https://frontendmasters
 ## Trying It Out
 
 1. `git clone`
-2. `npm install`
-3. `node relay.mjs` (starts the message relay server on localhost)
-
-   🚧 This will shortly be replaced with a default online gateway
-4. Navigate to `index.html`
-5. When ready, copy the URL and paste it into another browser
+2. Navigate to `index.html`
+3. When ready, copy the URL and paste it into another browser
 
 ## License
 
