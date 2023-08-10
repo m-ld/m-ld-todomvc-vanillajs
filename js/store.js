@@ -41,9 +41,9 @@ export class TodoStore extends EventTarget {
 		}
 		clone(new MemoryLevel, IoRemotes, {
 			'@id': uuid(),
-			'@domain': `${this.id}.todomvc.m-ld.org`,
+			'@domain': `${this.id}.public.gw.m-ld.org`,
 			genesis: isNew,
-			io: {uri: `http://${window.location.hostname}:3001`}
+			io: {uri: `https://gw.m-ld.org`}
 		}).then(async meld => {
 			this.meld = meld;
 			await meld.status.becomes({ outdated: false });
