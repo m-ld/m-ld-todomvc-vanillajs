@@ -9,8 +9,9 @@ This is a [vanilla Javascript implementation of TodoMVC](https://frontendmasters
 ## Trying It Out
 
 1. `git clone`
-2. Navigate to `index.html`
-3. When ready, copy the URL and paste it into another browser
+2. Serve `index.html` – e.g. using `npx http-server` in the project root
+3. Navigate to `index.html`
+4. When ready, copy the URL and paste it into another browser
 
 ## License
 
