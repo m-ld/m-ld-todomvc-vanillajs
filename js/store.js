@@ -1,4 +1,4 @@
-import {clone, isReference, updateSubject, uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
+import {uuid, clone, isReference, updateSubject} from 'https://edge.js.m-ld.org/ext/index.mjs';
 import {MemoryLevel} from 'https://edge.js.m-ld.org/ext/memory-level.mjs';
 import {IoRemotes} from 'https://edge.js.m-ld.org/ext/socket.io.mjs';
 
@@ -11,10 +11,10 @@ import {IoRemotes} from 'https://edge.js.m-ld.org/ext/socket.io.mjs';
 
 /** Store API for current Todos */
 export class TodoStore extends EventTarget {
-	constructor(todosId, isNew) {
+	constructor(todosId, token) {
 		super();
 		this.id = todosId;
-		this._readStorage(isNew);
+		this._readStorage(token);
 		// GETTER methods
 		this.get = (id) => this.todos.find((todo) => todo['@id'] === id);
 		this.isAllCompleted = () => this.todos.every((todo) => todo.completed);
@@ -29,7 +29,7 @@ export class TodoStore extends EventTarget {
 	_handleError = (error) => {
 		this.dispatchEvent(new ErrorEvent('error', {error}));
 	};
-	_readStorage(isNew) {
+	_readStorage(token) {
 		this.todos = [];
 		// This loads any new to-do details from plain references
 		// TODO: This will improve with the use of a reactive observable query
@@ -39,12 +39,12 @@ export class TodoStore extends EventTarget {
 					todos[i] = await state.get(todo['@id']);
 			}));
 		}
-		clone(new MemoryLevel, IoRemotes, {
-			'@id': uuid(),
-			'@domain': `${this.id}.public.gw.m-ld.org`,
-			genesis: isNew,
-			io: {uri: `https://gw.m-ld.org`}
-		}).then(async meld => {
+		// Exchange the access token for gateway domain configuration
+		fetch(`/api/config?domain=${this.id}`, {
+			headers: { 'Authorization': `Bearer ${token}` }
+		}).then(async configRes => {
+			const config = await configRes.json();
+			const meld = await clone(new MemoryLevel, IoRemotes, {'@id': uuid(), ...config});
 			this.meld = meld;
 			await meld.status.becomes({ outdated: false });
 			meld.read(async state => {

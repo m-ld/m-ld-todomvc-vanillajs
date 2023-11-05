@@ -1,4 +1,11 @@
-import {delegate, getURLHash, insertHTML, replaceHTML} from "./helpers.js";
+import {
+	delegate,
+	getAppLocation,
+	setAppLocation,
+	insertHTML,
+	replaceHTML,
+	setWindowURLFragment
+} from "./helpers.js";
 import {TodoStore} from "./store.js";
 import {uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
 
@@ -20,7 +27,7 @@ const App = {
 		},
 		updateFilterHashes() {
 			App.$.filters.forEach((el) => {
-				const {filter} = getURLHash(el.getAttribute('href'));
+				const {filter} = getAppLocation(el.getAttribute('href'));
 				el.setAttribute('href', `#/${App.todos.id}/${filter}`);
 			});
 		},
@@ -77,18 +84,41 @@ const App = {
 			}
 		}
 	},
-	init() {
+	async login() {
+		// Login removes the document fragment, so keep it in storage
+		// See https://www.rfc-editor.org/rfc/rfc6749#section-3.1.2
+		if (getAppLocation() != null) {
+			sessionStorage.setItem('docLocation', document.location.hash);
+			setWindowURLFragment(null);
+		}
+		const keycloak = new Keycloak({
+			url: 'https://app.please-open.it',
+			realm: '5d970145-a48d-4e9b-84ab-15de19f9d3a5',
+			clientId: 'app-local'
+		});
+		await keycloak.init({
+			onLoad: 'login-required',
+			flow: 'implicit',
+			checkLoginIframe: false
+		});
+		let docLocation = sessionStorage.getItem('docLocation');
+		if (docLocation != null) {
+			sessionStorage.removeItem('docLocation');
+			setWindowURLFragment(docLocation);
+		}
+		return keycloak.token;
+	},
+	async init() {
 		function onHashChange() {
-			let {documentId, filter} = getURLHash(document.location.hash);
-			const isNew = !documentId;
-			if (isNew) {
+			let {documentId, filter} = getAppLocation() ?? {};
+			if (!documentId) {
 				documentId = uuid();
-				history.pushState(null, null, `#/${documentId}/${filter}`);
+				setAppLocation(documentId, filter);
 			}
 			App.filter = filter;
 			if (App.todos == null || App.todos.id !== documentId) {
 				App.todos?.close();
-				App.todos = new TodoStore(documentId, isNew);
+				App.todos = new TodoStore(documentId, token);
 				App.$.updateFilterHashes();
 				App.todos.addEventListener("save", App.render);
 				App.todos.addEventListener("error", App.error);
@@ -97,11 +127,13 @@ const App = {
 				App.render();
 			}
 		}
+
+		let token = await App.login();
 		window.addEventListener("hashchange", onHashChange);
 		onHashChange();
 		App.$.input.addEventListener("keyup", (e) => {
 			if (e.key === "Enter" && e.target.value.length) {
-				App.todos.add({ title: e.target.value });
+				App.todos.add({title: e.target.value});
 				App.$.input.value = "";
 			}
 		});
@@ -185,4 +217,4 @@ const App = {
 	}
 };
 
-App.init();
+App.init().catch(error => App.error(new ErrorEvent('error', {error})));

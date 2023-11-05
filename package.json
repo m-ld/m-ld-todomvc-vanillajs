@@ -2,12 +2,19 @@
 	"private": true,
 	"scripts": {
 		"start": "python3 -m http.server 1337",
-		"format": "npx prettier --write ."
+		"format": "npx prettier --write .",
+		"local": "vercel dev --listen 3001"
 	},
 	"dependencies": {
+		"jose": "^5.0.1",
+		"needle": "^3.2.0",
 		"todomvc-app-css": "^2.0.0"
 	},
 	"dependenciesComments": {
 		"todomvc-app-css": "TodoMVC boilerplate CSS (not in use, just copy/pasted into css/index.css)"
+	},
+	"devDependencies": {
+		"@types/needle": "^3.2.2",
+		"@vercel/node": "^3.0.7"
 	}
 }
