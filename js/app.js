@@ -95,7 +95,7 @@ const App = {
 		const keycloak = new Keycloak({
 			url: "https://app.please-open.it",
 			realm: "5d970145-a48d-4e9b-84ab-15de19f9d3a5",
-			clientId: "app-local"
+			clientId: window.location.hostname
 		});
 		await keycloak.init({
 			onLoad: "login-required",
