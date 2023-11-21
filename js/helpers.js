@@ -26,3 +26,10 @@ export const replaceHTML = (el, html) => {
 	el.replaceChildren();
 	insertHTML(el, html);
 };
+
+// https://developer.mozilla.org/en-US/docs/Glossary/Base64#the_unicode_problem
+export function base64ToBytes(base64) {
+    const binString = atob(base64);
+	// noinspection JSCheckFunctionSignatures,JSUnresolvedReference
+	return Uint8Array.from(binString, m => m.codePointAt(0));
+}
