@@ -199,7 +199,7 @@ const App = {
 		App.$.toggleAll.checked = App.todos.isAllCompleted();
 		App.$.displayCount(App.todos.all("active").length);
 		App.$.input.disabled = false;
-    App.$.progress.hidden = true;
+		App.$.progress.hidden = true;
 		editing?.restore(saveEvent); // TODO: What if no longer present (filtered out or removed)
 	},
 	error(errEvent) {

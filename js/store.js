@@ -116,12 +116,10 @@ export class TodoStore extends EventTarget {
 		});
 	}
 	update({ '@id': id, title }) {
-		// The textDiff utility generates splices from a whole-text comparison
-		for (let splice of textDiff(this.get(id).title, title)) {
-			this._save({
-				'@update': {'@id': id, title: {'@splice': splice}}
-			});
-		}
+		// The textDiff utility generates a splice from a whole-text comparison
+		this._save({
+			'@update': {'@id': id, title: {'@splice': textDiff(this.get(id).title, title)}}
+		});
 	}
 	toggleAll() {
 		const completed = !this.hasCompleted() || !this.isAllCompleted();
