@@ -12,6 +12,7 @@ import {uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
 const App = {
 	$: {
 		input: document.querySelector('[data-todo="new"]'),
+		progress: document.querySelector('[data-todo="progress"]'),
 		toggleAll: document.querySelector('[data-todo="toggle-all"]'),
 		clear: document.querySelector('[data-todo="clear-completed"]'),
 		list: document.querySelector('[data-todo="list"]'),
@@ -88,22 +89,22 @@ const App = {
 		// Login removes the document fragment, so keep it in storage
 		// See https://www.rfc-editor.org/rfc/rfc6749#section-3.1.2
 		if (getAppLocation() != null) {
-			sessionStorage.setItem('docLocation', document.location.hash);
+			sessionStorage.setItem("docLocation", document.location.hash);
 			setWindowURLFragment(null);
 		}
 		const keycloak = new Keycloak({
-			url: 'https://app.please-open.it',
-			realm: '5d970145-a48d-4e9b-84ab-15de19f9d3a5',
-			clientId: 'app-local'
+			url: "https://app.please-open.it",
+			realm: "5d970145-a48d-4e9b-84ab-15de19f9d3a5",
+			clientId: "app-local"
 		});
 		await keycloak.init({
-			onLoad: 'login-required',
-			flow: 'implicit',
+			onLoad: "login-required",
+			flow: "implicit",
 			checkLoginIframe: false
 		});
-		let docLocation = sessionStorage.getItem('docLocation');
+		let docLocation = sessionStorage.getItem("docLocation");
 		if (docLocation != null) {
-			sessionStorage.removeItem('docLocation');
+			sessionStorage.removeItem("docLocation");
 			setWindowURLFragment(docLocation);
 		}
 		return keycloak.token;
@@ -112,9 +113,10 @@ const App = {
 		function onHashChange() {
 			let {documentId, filter} = getAppLocation() ?? {};
 			if (!documentId) {
-				documentId = uuid();
+				documentId = (documentId ?? localStorage.getItem("lastTodoList")) || uuid();
 				setAppLocation(documentId, filter);
 			}
+			localStorage.setItem("lastTodoList", documentId);
 			App.filter = filter;
 			if (App.todos == null || App.todos.id !== documentId) {
 				App.todos?.close();
@@ -205,6 +207,7 @@ const App = {
 		App.$.toggleAll.checked = App.todos.isAllCompleted();
 		App.$.displayCount(App.todos.all("active").length);
 		App.$.input.disabled = false;
+		App.$.progress.hidden = true;
 		editing?.restore(); // TODO: What if no longer present (filtered out or removed)
 	},
 	error(errEvent) {

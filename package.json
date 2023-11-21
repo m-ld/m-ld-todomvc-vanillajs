@@ -11,10 +11,12 @@
 		"todomvc-app-css": "^2.0.0"
 	},
 	"dependenciesComments": {
-		"todomvc-app-css": "TodoMVC boilerplate CSS (not in use, just copy/pasted into css/index.css)"
+		"todomvc-app-css": "TodoMVC boilerplate CSS (not in use, just copy/pasted into css/index.css)",
+		"keystore-idb": "Runtime script via unpkg.com"
 	},
 	"devDependencies": {
 		"@types/needle": "^3.2.2",
-		"@vercel/node": "^3.0.7"
+		"@vercel/node": "^3.0.7",
+		"keystore-idb": "^0.15.5"
 	}
 }

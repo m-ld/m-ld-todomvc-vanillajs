@@ -7,11 +7,13 @@
 		<!-- TodoMVC Boilerplate CSS files -->
 		<link rel="stylesheet" href="css/index.css" />
 		<script src="https://app.please-open.it/auth/js/keycloak.js"></script>
+		<script src="https://unpkg.com/keystore-idb@0.15.5/dist/index.umd.min.js"></script>
 	</head>
 	<body>
 		<section class="todoapp">
 			<header class="header">
 				<h1><a href=".#//">todos</a></h1>
+				<progress max="100" data-todo="progress" style="width: 100%;">Loading...</progress>
 				<input
 					placeholder="What needs to be done?"
 					autofocus

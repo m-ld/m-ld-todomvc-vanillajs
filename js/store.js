@@ -1,6 +1,7 @@
 import {uuid, clone, isReference, updateSubject} from 'https://edge.js.m-ld.org/ext/index.mjs';
 import {MemoryLevel} from 'https://edge.js.m-ld.org/ext/memory-level.mjs';
 import {IoRemotes} from 'https://edge.js.m-ld.org/ext/socket.io.mjs';
+import {Device} from "./device.js";
 
 /**
  * @typedef {object} Todo
@@ -14,7 +15,7 @@ export class TodoStore extends EventTarget {
 	constructor(todosId, token) {
 		super();
 		this.id = todosId;
-		this._readStorage(token);
+		this._readStorage(token).catch(this._handleError);
 		// GETTER methods
 		this.get = (id) => this.todos.find((todo) => todo['@id'] === id);
 		this.isAllCompleted = () => this.todos.every((todo) => todo.completed);
@@ -29,7 +30,7 @@ export class TodoStore extends EventTarget {
 	_handleError = (error) => {
 		this.dispatchEvent(new ErrorEvent('error', {error}));
 	};
-	_readStorage(token) {
+	async _readStorage(token) {
 		this.todos = [];
 		// This loads any new to-do details from plain references
 		// TODO: This will improve with the use of a reactive observable query
@@ -39,24 +40,31 @@ export class TodoStore extends EventTarget {
 					todos[i] = await state.get(todo['@id']);
 			}));
 		}
+		const device = await Device.here();
 		// Exchange the access token for gateway domain configuration
-		fetch(`/api/config?domain=${this.id}`, {
-			headers: { 'Authorization': `Bearer ${token}` }
-		}).then(async configRes => {
-			const config = await configRes.json();
-			const meld = await clone(new MemoryLevel, IoRemotes, {'@id': uuid(), ...config});
-			this.meld = meld;
-			await meld.status.becomes({ outdated: false });
-			meld.read(async state => {
-				this.todos = (await state.get('todos'))?.['@list'] ?? [];
-				await loadTodoReferences(this.todos, state);
-				this.dispatchEvent(new CustomEvent("save"));
-			}, async (update, state) => {
-				updateSubject({'@id': 'todos', '@list': this.todos}, update);
-				await loadTodoReferences(this.todos, state);
-				this.dispatchEvent(new CustomEvent("save"));
-			});
-		}).catch(this._handleError);
+		const configRes = await fetch(`/api/config?domain=${this.id}`, {
+			method: 'POST',
+			headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+			body: JSON.stringify(device.key)
+		});
+		const {config, pid} = await configRes.json();
+		const meld = await clone(
+			new MemoryLevel,
+			IoRemotes,
+			{'@id': uuid(), ...config},
+			device.asMeldApp(pid)
+		);
+		this.meld = meld;
+		await meld.status.becomes({outdated: false});
+		meld.read(async state => {
+			this.todos = (await state.get('todos'))?.['@list'] ?? [];
+			await loadTodoReferences(this.todos, state);
+			this.dispatchEvent(new CustomEvent("save"));
+		}, async (update, state) => {
+			updateSubject({'@id': 'todos', '@list': this.todos}, update);
+			await loadTodoReferences(this.todos, state);
+			this.dispatchEvent(new CustomEvent("save"));
+		});
 	}
 	_save(write) {
 		this.meld.write(write).catch(this._handleError);

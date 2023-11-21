@@ -25,6 +25,7 @@ export default async function (req, res) {
 	};
 	try {
 		const subdomain = req.query.domain;
+		const key = req.body;
 		const [type, token] = req.headers.authorization?.split(" ") ?? [];
 		if (type !== "Bearer")
 			return sendErr(401, 'Unauthorised');
@@ -32,10 +33,12 @@ export default async function (req, res) {
 			.catch(throwErr(401, 'Unauthorised'));
 		await checkAccess(payload.sub, subdomain)
 			.catch(throwErr(403, 'Forbidden'));
+		const pid = `${AUTH_SERVER_URL}/users/${payload.sub}`;
 		const configRes = await request('put', new URL(
 			`/api/v1/domain/${GATEWAY.accountName}/${subdomain}`, GATEWAY.accountUrl
 		).toString(), {
-			user: {'@id': `${AUTH_SERVER_URL}/users/${payload.sub}`}
+			useSignatures: 'public' in key,
+			user: {'@id': pid, key}
 		}, {
 			json: true,
 			auth: 'basic',
@@ -44,7 +47,7 @@ export default async function (req, res) {
 		});
 		if (configRes.statusCode !== 200)
 			return sendErr(configRes.statusCode, configRes.statusMessage, configRes.body);
-		res.status(200).json(configRes.body);
+		res.status(200).json({config: configRes.body, pid});
 	} catch (error) {
 		error.send ? error.send() : sendErr(500, 'Internal Server Error', error);
 	}
