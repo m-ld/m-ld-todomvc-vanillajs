@@ -1,10 +1,17 @@
-import {delegate, getURLHash, insertHTML, replaceHTML} from "./helpers.js";
+import {
+	delegate,
+	getAppLocation,
+	setAppLocation,
+	insertHTML,
+	replaceHTML
+} from "./helpers.js";
 import {TodoStore} from "./store.js";
 import {uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
 
 const App = {
 	$: {
 		input: document.querySelector('[data-todo="new"]'),
+		progress: document.querySelector('[data-todo="progress"]'),
 		toggleAll: document.querySelector('[data-todo="toggle-all"]'),
 		clear: document.querySelector('[data-todo="clear-completed"]'),
 		list: document.querySelector('[data-todo="list"]'),
@@ -20,7 +27,7 @@ const App = {
 		},
 		updateFilterHashes() {
 			App.$.filters.forEach((el) => {
-				const {filter} = getURLHash(el.getAttribute('href'));
+				const {filter} = getAppLocation(el.getAttribute('href'));
 				el.setAttribute('href', `#/${App.todos.id}/${filter}`);
 			});
 		},
@@ -98,13 +105,13 @@ const App = {
 			}
 		}
 	},
-	init() {
+	async init() {
 		function onHashChange() {
-			let {documentId, filter} = getURLHash(document.location.hash);
+			let {documentId, filter} = getAppLocation() ?? {};
 			const isNew = !documentId;
 			if (isNew) {
 				documentId = uuid();
-				history.pushState(null, null, `#/${documentId}/${filter}`);
+				setAppLocation(documentId, filter);
 			}
 			App.filter = filter;
 			if (App.todos == null || App.todos.id !== documentId) {
@@ -192,6 +199,7 @@ const App = {
 		App.$.toggleAll.checked = App.todos.isAllCompleted();
 		App.$.displayCount(App.todos.all("active").length);
 		App.$.input.disabled = false;
+    App.$.progress.hidden = true;
 		editing?.restore(saveEvent); // TODO: What if no longer present (filtered out or removed)
 	},
 	error(errEvent) {
@@ -204,4 +212,4 @@ const App = {
 	}
 };
 
-App.init();
+App.init().catch(error => App.error(new ErrorEvent('error', {error})));
