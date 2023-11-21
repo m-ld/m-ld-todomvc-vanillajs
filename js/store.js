@@ -1,6 +1,7 @@
-import {clone, isReference, updateSubject, uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
+import {clone, isReference, updateSubject, uuid, textDiff} from 'https://edge.js.m-ld.org/ext/index.mjs';
 import {MemoryLevel} from 'https://edge.js.m-ld.org/ext/memory-level.mjs';
 import {IoRemotes} from 'https://edge.js.m-ld.org/ext/socket.io.mjs';
+import {TSeqText} from 'https://edge.js.m-ld.org/ext/tseq.mjs';
 
 /**
  * @typedef {object} Todo
@@ -25,6 +26,7 @@ export class TodoStore extends EventTarget {
 				: filter === "completed"
 				? this.todos.filter((todo) => todo.completed)
 				: this.todos;
+		this._updating = false;
 	}
 	_handleError = (error) => {
 		this.dispatchEvent(new ErrorEvent('error', {error}));
@@ -48,7 +50,8 @@ export class TodoStore extends EventTarget {
 		const meld = await clone(
 			new MemoryLevel,
 			IoRemotes,
-			config
+			config,
+      new TSeqText('title')
 		);
 		this.meld = meld;
 		await meld.status.becomes({ outdated: false });
@@ -59,11 +62,23 @@ export class TodoStore extends EventTarget {
 		}, async (update, state) => {
 			updateSubject({'@id': 'todos', '@list': this.todos}, update);
 			await loadTodoReferences(this.todos, state);
-			this.dispatchEvent(new CustomEvent("save"));
+			this.dispatchEvent(new CustomEvent("save", {
+					// We include the actual update made as a detail of the save
+					// event so that the app can adjust the caret and selection
+					detail: {update, isEcho: this._updating}
+				}));
 		});
 	}
 	_save(write) {
-		this.meld.write(write).catch(this._handleError);
+		this.meld.write(async (state) => {
+			// This allows us to tell the app whether an update is an echo
+			this._updating = true;
+			try {
+				await state.write(write);
+			} finally {
+				this._updating = false;
+			}
+		}).catch(this._handleError);
 	}
 	// MUTATE methods
 	add({ title }) {
@@ -101,8 +116,9 @@ export class TodoStore extends EventTarget {
 		});
 	}
 	update({ '@id': id, title }) {
+		// The textDiff utility generates a splice from a whole-text comparison
 		this._save({
-			'@update': {'@id': id, title}
+			'@update': {'@id': id, title: {'@splice': textDiff(this.get(id).title, title)}}
 		});
 	}
 	toggleAll() {
