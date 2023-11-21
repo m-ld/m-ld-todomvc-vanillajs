@@ -29,7 +29,7 @@ export class TodoStore extends EventTarget {
 	_handleError = (error) => {
 		this.dispatchEvent(new ErrorEvent('error', {error}));
 	};
-	_readStorage(isNew) {
+	async _readStorage(isNew) {
 		this.todos = [];
 		// This loads any new to-do details from plain references
 		// TODO: This will improve with the use of a reactive observable query
@@ -39,24 +39,28 @@ export class TodoStore extends EventTarget {
 					todos[i] = await state.get(todo['@id']);
 			}));
 		}
-		clone(new MemoryLevel, IoRemotes, {
+		const config = {
 			'@id': uuid(),
 			'@domain': `${this.id}.public.gw.m-ld.org`,
 			genesis: isNew,
 			io: {uri: `https://gw.m-ld.org`}
-		}).then(async meld => {
-			this.meld = meld;
-			await meld.status.becomes({ outdated: false });
-			meld.read(async state => {
-				this.todos = (await state.get('todos'))?.['@list'] ?? [];
-				await loadTodoReferences(this.todos, state);
-				this.dispatchEvent(new CustomEvent("save"));
-			}, async (update, state) => {
-				updateSubject({'@id': 'todos', '@list': this.todos}, update);
-				await loadTodoReferences(this.todos, state);
-				this.dispatchEvent(new CustomEvent("save"));
-			});
-		}).catch(this._handleError);
+		};
+		const meld = await clone(
+			new MemoryLevel,
+			IoRemotes,
+			config
+		);
+		this.meld = meld;
+		await meld.status.becomes({ outdated: false });
+		meld.read(async state => {
+			this.todos = (await state.get('todos'))?.['@list'] ?? [];
+			await loadTodoReferences(this.todos, state);
+			this.dispatchEvent(new CustomEvent("save"));
+		}, async (update, state) => {
+			updateSubject({'@id': 'todos', '@list': this.todos}, update);
+			await loadTodoReferences(this.todos, state);
+			this.dispatchEvent(new CustomEvent("save"));
+		});
 	}
 	_save(write) {
 		this.meld.write(write).catch(this._handleError);
