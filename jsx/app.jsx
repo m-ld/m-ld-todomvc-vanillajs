@@ -1,31 +1,34 @@
-import React, {useRef, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import useGlobalStore from "./GlobalStore";
+import {useBehaviour, useFilter, useObservableError, useObservableValue, useStore} from "./helpers";
+import {TodoStore} from "../js/store";
 
 function App() {
-	const {todos, filter, error, ready} = useGlobalStore();
+	const store = useStore();
+	const ready = useBehaviour(store);
+	const error = useObservableError(store);
 	return error ? (
 		<header className="header">
-			<h1><a href=".">todos</a></h1>
+			<h1><a href=".">store</a></h1>
 			<p>{error}</p>
 		</header>
 	) : (
 		<>
-			<Header todos={todos} ready={ready}></Header>
-			<Main todos={todos} filter={filter}></Main>
-			<Footer todos={todos}></Footer>
+			<Header store={store} ready={ready}></Header>
+			<Main store={store}></Main>
+			<Footer store={store}></Footer>
 		</>
 	);
 }
 
 /**
- * @param {TodoStore} todos
+ * @param {TodoStore} store
  * @param {boolean} ready
  * @constructor
  */
-function Header({todos, ready}) {
+function Header({store, ready}) {
 	return <header className="header">
-		<h1><a href=".">todos</a></h1>
+		<h1><a href=".">Todos</a></h1>
 		<progress
 			max="100"
 			data-todo="progress"
@@ -41,7 +44,7 @@ function Header({todos, ready}) {
 			onKeyUp={(e) => {
 				const input = /**@type HTMLInputElement*/e.target;
 				if (e.key === "Enter" && input.value.length) {
-					todos.add({title: input.value});
+					store.add({title: input.value});
 					input.value = "";
 				}
 			}}
@@ -50,38 +53,44 @@ function Header({todos, ready}) {
 }
 
 /**
- * This section should be hidden by default and shown when there are todos
- * @param {TodoStore} todos
- * @param {string} filter
+ * This section should be hidden by default and shown when there are store
+ * @param {TodoStore} store
  * @constructor
  */
-function Main({todos, filter}) {
-	const filteredTodos = todos.all(filter).map(
-		todo => <TodoLi key={todo['@id']} todo={todo} todos={todos}/>);
+function Main({store}) {
+	const filter = useFilter();
+	const todoSummary = useObservableValue(store.watchSummary, []);
+	const todoComponents = todoSummary
+		.filter(summary => TodoStore.matches(summary, filter))
+		.map(todo => <TodoLi key={todo['@id']} id={todo['@id']} store={store}/>);
 	return <section
 		className="main"
-		style={{display: todos.all().length ? 'block' : 'none'}}>
+		style={{display: todoSummary.length ? 'block' : 'none'}}>
 		<input
 			id="toggle-all"
 			className="toggle-all"
 			type="checkbox"
-			checked={todos.isAllCompleted()}
+			checked={todoSummary.every(({completed}) => completed)}
 			onChange={() => {
-				todos.toggleAll();
+				store.toggleAll(todoSummary.some(({completed}) => !completed));
 			}}
 		/>
 		<label htmlFor="toggle-all">Mark all as complete</label>
-		<ul className="todo-list">{filteredTodos}</ul>
+		<ul className="todo-list">{todoComponents}</ul>
 	</section>;
 }
 
 /**
- * @param {Todo} todo
- * @param {TodoStore} todos
+ * @param {string} id
+ * @param {TodoStore} store
  * @constructor
  */
-function TodoLi({todos, todo}) {
+function TodoLi({store, id}) {
 	const [editing, setEditing] = useState(false);
+	const todo = useObservableValue(
+		useMemo(() => store.watchTodo(id), [store, id]),
+		{completed: false, title: "loading..."}
+	);
 	/** @type {React.MutableRefObject<HTMLInputElement>} */
 	const inputRef = useRef();
 	return <li className={editing ? 'editing' : ''}>
@@ -91,7 +100,7 @@ function TodoLi({todos, todo}) {
 				type="checkbox"
 				checked={todo.completed}
 				onChange={() => {
-					todos.toggle(todo)
+					store.toggle(todo)
 				}}
 			/>
 			<label
@@ -103,7 +112,7 @@ function TodoLi({todos, todo}) {
 			<button
 				className="destroy"
 				onClick={() => {
-					todos.remove(todo);
+					store.remove(todo);
 				}}>
 			</button>
 		</div>
@@ -114,7 +123,7 @@ function TodoLi({todos, todo}) {
 			onKeyUp={e => {
 				const input = inputRef.current;
 				if (e.key === "Enter" && input.value) {
-					todos.update({...todo, title: input.value});
+					store.update({...todo, title: input.value});
 					setEditing(false);
 				}
 				if (e.key === "Escape") {
@@ -129,28 +138,29 @@ function TodoLi({todos, todo}) {
 }
 
 /**
- * This footer should be hidden by default and shown when there are todos
- * @param {TodoStore} todos
+ * This footer should be hidden by default and shown when there are store
+ * @param {TodoStore} store
  * @constructor
  */
-function Footer({todos}) {
-	const count = todos.all("active").length;
+function Footer({store}) {
+	const todoSummary = useObservableValue(store.watchSummary, []);
+	const count = todoSummary.length;
 	return <footer
 		className="footer"
-		style={{display: todos.all().length ? 'block' : 'none'}}>
+		style={{display: count ? 'block' : 'none'}}>
 		<span className="todo-count">
 			<strong>{count}</strong> item{count === 1 ? '' : 's'} left
 		</span>
 		<ul className="filters">
-			<li><a className="selected" href={`#/${todos.id}/`}>All</a></li>
-			<li><a href={`#/${todos.id}/active`}>Active</a></li>
-			<li><a href={`#/${todos.id}/completed`}>Completed</a></li>
+			<li><a className="selected" href={`#/${store.id}/`}>All</a></li>
+			<li><a href={`#/${store.id}/active`}>Active</a></li>
+			<li><a href={`#/${store.id}/completed`}>Completed</a></li>
 		</ul>
 		<button
 			className="clear-completed"
-			style={{display: todos.hasCompleted() ? 'block' : 'none'}}
+			style={{display: todoSummary.some(({completed}) => completed) ? 'block' : 'none'}}
 			onClick={() => {
-				todos.clearCompleted();
+				store.clearCompleted();
 			}}>
 			Clear completed
 		</button>
