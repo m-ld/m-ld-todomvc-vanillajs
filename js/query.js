@@ -9,7 +9,6 @@ enablePatches();
 /** @typedef {import('@m-ld/m-ld').MeldUpdate} MeldUpdate */
 /** @typedef {import('@m-ld/m-ld').Query} Query */
 /** @typedef {import('@m-ld/m-ld').GraphSubject} GraphSubject */
-
 /** @typedef {import('@m-ld/m-ld').Reference} Reference */
 
 /**
