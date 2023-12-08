@@ -1,196 +1,202 @@
-import {
-	delegate,
-	getAppLocation,
-	setAppLocation,
-	insertHTML,
-	replaceHTML
-} from "./helpers.js";
-import {TodoStore} from "./store.js";
-import {uuid} from 'https://edge.js.m-ld.org/ext/index.mjs';
+import {getAppLocation, keyedElements, matches, processHash, replaceHTML} from "./helpers.js";
+import {initModel} from "./model.js";
+import {watchQuery, watchSubject} from "./query.js";
+import {Subscription} from "rxjs";
 
-const App = {
-	$: {
-		input: document.querySelector('[data-todo="new"]'),
-		progress: document.querySelector('[data-todo="progress"]'),
-		toggleAll: document.querySelector('[data-todo="toggle-all"]'),
-		clear: document.querySelector('[data-todo="clear-completed"]'),
-		list: document.querySelector('[data-todo="list"]'),
-		filters: document.querySelectorAll(`[data-todo="filters"] a`),
-		showMain(show) {
-			document.querySelector('[data-todo="main"]').style.display = show ? "block" : "none";
-		},
-		showFooter(show) {
-			document.querySelector('[data-todo="footer"]').style.display = show ? "block" : "none";
-		},
-		showClear(show) {
-			App.$.clear.style.display = show ? "block" : "none";
-		},
-		updateFilterHashes() {
-			App.$.filters.forEach((el) => {
-				const {filter} = getAppLocation(el.getAttribute('href'));
-				el.setAttribute('href', `#/${App.todos.id}/${filter}`);
-			});
-		},
-		setActiveFilter(filter) {
-			App.$.filters.forEach((el) => {
-				if (el.matches(`[href="#/${App.todos.id}/${filter}"]`)) {
-					el.classList.add("selected");
-				} else {
-					el.classList.remove("selected");
-				}
-			});
-		},
-		displayCount(count) {
-			replaceHTML(
-				document.querySelector('[data-todo="count"]'),
-				`
-				<strong>${count}</strong>
-				${count === 1 ? "item" : "items"} left
-			`
-			);
-		},
-		getTodo(liOrId) {
-			let $li = liOrId instanceof Element ? liOrId :
-				document.querySelector(`[data-id="${liOrId}"]`);
-			return $li && {
-				$li,
-				get $input() {
-					return $li.querySelector('[data-todo="edit"]')
-				},
-				get $label() {
-					return $li.querySelector('[data-todo="label"]')
-				}
-			};
-		},
-		getEditing() {
-			const $li = document.querySelector('.editing');
-			if ($li != null) {
-				const editingId = $li.dataset.id;
-				const $input = App.$.getTodo($li).$input;
-				const selection = [$input.selectionStart, $input.selectionEnd];
-				return {
-					id: editingId,
-					restore() { return App.$.setEditing(editingId, ...selection); }
-				}
-			}
-		},
-		setEditing(liOrId, selectionStart, selectionEnd) {
-			let $todo = App.$.getTodo(liOrId);
-			if ($todo != null) {
-				$todo.$li.classList.add("editing");
-				$todo.$input.focus();
-				$todo.$input.setSelectionRange(selectionStart, selectionEnd);
-				return $todo;
-			}
-		}
-	},
-	async init() {
-		function onHashChange() {
-			let {documentId, filter} = getAppLocation() ?? {};
-			const isNew = !documentId;
-			if (isNew) {
-				documentId = uuid();
-				setAppLocation(documentId, filter);
-			}
-			App.filter = filter;
-			if (App.todos == null || App.todos.id !== documentId) {
-				App.todos?.close();
-				App.todos = new TodoStore(documentId, isNew);
-				App.$.updateFilterHashes();
-				App.todos.addEventListener("save", App.render);
-				App.todos.addEventListener("error", App.error);
-			} else {
-				App.$.setActiveFilter(App.filter);
-				App.render();
-			}
-		}
-		window.addEventListener("hashchange", onHashChange);
-		onHashChange();
-		App.$.input.addEventListener("keyup", (e) => {
+const $ = keyedElements(document);
+
+export default new class App {
+	/**@type string*/filter;
+	/**@type string*/modelId;
+	/**@type MeldClone*/model;
+	/**@type {{'@id': string, completed: boolean}[]}*/summary;
+	todoSubs = new Subscription;
+
+	constructor() {
+		window.addEventListener("hashchange", this.onHashChange);
+		this.onHashChange();
+		$["new"].addEventListener("keyup", (e) => {
 			if (e.key === "Enter" && e.target.value.length) {
-				App.todos.add({ title: e.target.value });
-				App.$.input.value = "";
+				this.model.write({
+					'@id': 'todos',
+					'@list': {
+						[this.summary.length]: {
+							title: e.target.value,
+							completed: false,
+							'@id': "id_" + Date.now(),
+						}
+					}
+				}).catch(this.error);
+				$["new"].value = "";
 			}
 		});
-		App.$.toggleAll.addEventListener("click", () => {
-			App.todos.toggleAll();
+		$["toggle-all"].addEventListener("click", () => {
+			const anyActive = this.summary.some(({completed}) => !completed);
+			this.model.write({
+				"@delete": {"@id": "?id", completed: !anyActive},
+				"@insert": {"@id": "?id", completed: anyActive}
+			}).catch(this.error);
 		});
-		App.$.clear.addEventListener("click", () => {
-			App.todos.clearCompleted();
+		$["clear-completed"].addEventListener("click", () => {
+			this.model.write({
+				"@delete": {
+					"@id": "todos",
+					"@list": {"?": {completed: true, "?": "?"}}
+				}
+			}).catch(this.error);
 		});
-		App.bindTodoEvents();
-	},
-	todoEvent(event, selector, handler) {
-		delegate(App.$.list, selector, event, (e) => {
-			let $el = e.target.closest("[data-id]");
-			handler(App.todos.get($el.dataset.id), $el, e);
-		});
-	},
-	bindTodoEvents() {
-		App.todoEvent("click", '[data-todo="destroy"]', (todo) => App.todos.remove(todo));
-		App.todoEvent("click", '[data-todo="toggle"]', (todo) => App.todos.toggle(todo));
-		App.todoEvent("dblclick", '[data-todo="label"]', (_, $li) => {
-			App.$.setEditing($li);
-		});
-		App.todoEvent("keyup", '[data-todo="edit"]', (todo, $li, e) => {
-			let $input = App.$.getTodo($li).$input;
-			if (e.key === "Enter" && $input.value) {
-				$li.classList.remove("editing");
-				App.todos.update({ ...todo, title: $input.value });
-			}
-			if (e.key === "Escape") {
-				document.activeElement.blur();
-			}
-		});
-		App.todoEvent("focusout", '[data-todo="edit"]', (todo, $li) => {
-			if ($li.classList.contains("editing")) {
-				App.render();
-			}
-		});
-	},
-	createTodoItem(todo) {
-		const li = document.createElement("li");
-		li.dataset.id = todo['@id'];
-		if (todo.completed) {
-			li.classList.add("completed");
+		const bindTodoEvent = (key, event, handler) => {
+			$["list"].addEventListener(event, e => {
+				if (e.target.matches(`[data-key="${key}"]`)) {
+					const el = e.target.closest("[data-id]");
+					handler(el.dataset.id, el, e);
+				}
+			});
 		}
-		insertHTML(
-			li,
-			`
-			<div class="view">
-				<input data-todo="toggle" class="toggle" type="checkbox" ${todo.completed ? "checked" : ""}>
-				<label data-todo="label"></label>
-				<button class="destroy" data-todo="destroy"></button>
-			</div>
-			<input class="edit" data-todo="edit">
-		`
+		bindTodoEvent("destroy", "click", id => {
+			this.model.write({
+				'@delete': {
+					'@id': 'todos',
+					'@list': {'?': {'@id': id, '?': '?'}}
+				}
+			}).catch(this.error);
+		});
+		bindTodoEvent("toggle", "click", (id, _, e) => {
+			this.model.write({
+				'@update': {'@id': id, completed: e.target.checked}
+			}).catch(this.error);
+		});
+		bindTodoEvent("label", "dblclick", (_, li) => {
+			this.setEditing(li);
+		});
+		bindTodoEvent("edit", "keyup", (id, li, e) => {
+			const input = this.getTodo$(li)["edit"];
+			if (e.key === "Enter" && input.value) {
+				li.classList.remove("editing");
+				this.model.write({
+					'@update': {'@id': id, title: input.value}
+				}).catch(this.error);
+			}
+			if (e.key === "Escape")
+				document.activeElement.blur();
+		});
+		bindTodoEvent("edit", "focusout", (todo, li) => {
+			if (li.classList.contains("editing"))
+				this.refresh();
+		});
+	}
+
+	onHashChange = () => {
+		const {modelId, isNew, filter} = processHash();
+		this.filter = filter;
+		if (this.model == null || this.modelId !== modelId) {
+			this.model?.close().catch(console.error);
+			initModel(modelId, isNew).then(model => {
+				this.model = model;
+				this.modelId = modelId;
+				$["filters"].querySelectorAll('a').forEach((el) => {
+					const {filter} = getAppLocation(el.getAttribute('href'));
+					el.setAttribute('href', `#/${this.modelId}/${filter}`);
+				});
+				watchQuery(model, async state =>
+					await state.read({
+						"@construct": {
+							"@id": "todos",
+							"@list": {"?i": {"@id": "?", "completed": "?c"}}
+						}
+					})
+				).subscribe(([todos]) => {
+					this.summary = todos?.["@list"] ?? [];
+					this.refresh();
+				});
+			}).catch(this.error);
+		} else {
+			this.setActiveFilter(this.filter);
+			this.refresh();
+		}
+	};
+
+	setActiveFilter(filter) {
+		$["filters"].querySelectorAll('a').forEach(el => {
+			const selected = el.matches(`[href="#/${this.modelId}/${filter}"]`);
+			el.classList[selected ? "add" : "remove"]("selected");
+		});
+	}
+
+	getEditing() {
+		const li = document.querySelector('.editing');
+		if (li != null) {
+			const editingId = li.dataset.id;
+			const input = this.getTodo$(li)["edit"];
+			const selection = [input.selectionStart, input.selectionEnd];
+			return {
+				id: editingId,
+				restore: () => this.setEditing(editingId, ...selection)
+			}
+		}
+	}
+
+	setEditing(liOrId, selectionStart, selectionEnd) {
+		const $todo = this.getTodo$(liOrId);
+		if ($todo != null) {
+			$todo.self.classList.add("editing");
+			$todo["edit"].focus();
+			$todo["edit"].setSelectionRange(selectionStart, selectionEnd);
+			return $todo;
+		}
+	}
+
+	getTodo$(liOrId) {
+		const li = liOrId instanceof Element ? liOrId :
+			document.querySelector(`[data-id="${liOrId}"]`);
+		return li && keyedElements(li);
+	}
+
+	refresh() {
+		const editing = this.getEditing(),
+			anyCompleted = this.summary.some(({completed}) => completed),
+			allCompleted = this.summary.every(({completed}) => completed),
+			active = this.summary.filter(({completed}) => !completed);
+		this.setActiveFilter(this.filter);
+		this.todoSubs.unsubscribe();
+		this.todoSubs = new Subscription;
+		$["list"].replaceChildren(
+			$["todo-template"],
+			...this.summary
+				.filter(item => matches(item, this.filter))
+				.map(({"@id": id}) => {
+					const templateFragment =
+						$["todo-template"].content.cloneNode(true);
+					const $li = keyedElements(templateFragment.querySelector("li"));
+					$li.self.dataset.id = id;
+					this.todoSubs.add(watchSubject(this.model, id).subscribe(todo => {
+						$li.self.classList[todo.completed ? "add" : "remove"]("completed");
+						$li["toggle"].checked = todo.completed;
+						$li["label"].textContent = todo.title;
+						$li["edit"].value = todo.title;
+					}));
+					return templateFragment;
+				})
 		);
-		App.$.getTodo(li).$label.textContent = todo.title;
-		App.$.getTodo(li).$input.value = todo.title;
-		return li;
-	},
-	render(saveEvent) {
-		const editing = saveEvent && App.$.getEditing();
-		const count = App.todos.all().length;
-		App.$.setActiveFilter(App.filter);
-		App.$.list.replaceChildren(...App.todos.all(App.filter).map((todo) => App.createTodoItem(todo)));
-		App.$.showMain(count);
-		App.$.showFooter(count);
-		App.$.showClear(App.todos.hasCompleted());
-		App.$.toggleAll.checked = App.todos.isAllCompleted();
-		App.$.displayCount(App.todos.all("active").length);
-		App.$.input.disabled = false;
-		App.$.progress.hidden = true;
+		$["main"].style.display = this.summary.length ? "block" : "none";
+		$["footer"].style.display = this.summary.length ? "block" : "none";
+		$["clear-completed"].style.display = anyCompleted ? "block" : "none";
+		$["toggle-all"].checked = allCompleted;
+		replaceHTML($["count"], `
+			<strong>${(active.length)}</strong>
+			${active.length === 1 ? "item" : "items"} left
+		`);
+		$["new"].disabled = false;
+		$["progress"].hidden = true;
 		editing?.restore(); // TODO: What if no longer present (filtered out or removed)
-	},
-	error(errEvent) {
-		replaceHTML(document.querySelector('.todoapp'), `
+	}
+
+	error = err => {
+		replaceHTML($["app"], `
 		<header class="header">
 			<h1><a href=".">todos</a></h1>
-			<p>${errEvent.error}</p>
+			<p>${err}</p>
 		</header>
 		`);
-	}
-};
-
-App.init().catch(error => App.error(new ErrorEvent('error', {error})));
+	};
+}();

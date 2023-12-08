@@ -1,12 +1,14 @@
+import {uuid} from "@m-ld/m-ld";
+
 export function getAppLocation(hash = document.location.hash) {
 	// Document hash may be the document ID/filter, a login redirect, or nothing
 	let match = hash.match(/^#\/(\w*)\/(\w*)$/);
 	if (match)
-		return {documentId: match[1], filter: match[2]};
+        return {modelId: match[1], filter: match[2]};
 }
 
-export function setAppLocation(documentId, filter) {
-	setWindowURLFragment(`#/${documentId ?? ''}/${filter ?? ''}`);
+export function setAppLocation(modelId, filter) {
+    setWindowURLFragment(`#/${modelId ?? ''}/${filter ?? ''}`);
 }
 
 export function setWindowURLFragment(url) {
@@ -14,15 +16,38 @@ export function setWindowURLFragment(url) {
 	history.pushState(null, null, url ?? window.location.pathname);
 }
 
-export const delegate = (el, selector, event, handler) => {
-	el.addEventListener(event, (e) => {
-		if (e.target.matches(selector)) handler(e, el);
-	});
-};
+export function processHash() {
+    let {modelId, filter} = getAppLocation() ?? {};
+    const isNew = !modelId;
+    if (isNew) {
+        modelId = uuid();
+        setAppLocation(modelId, filter);
+    }
+    return {modelId, isNew, filter};
+}
 
-export const insertHTML = (el, html) => el.insertAdjacentHTML("afterbegin", html);
+export function matches({completed}, filter) {
+    return filter === "active"
+        ? !completed
+        : filter === "completed"
+            ? completed
+            : true;
+}
 
 export const replaceHTML = (el, html) => {
 	el.replaceChildren();
-	insertHTML(el, html);
+	el.insertAdjacentHTML("afterbegin", html);
 };
+
+/**
+ * @template T
+ * @param {T} root
+ * @returns {{[key: string]: Element | T}}
+ */
+export function keyedElements(root) {
+	return new Proxy({self: root}, {
+		get(t, p) {
+			return t[p] ??= root.querySelector(`[data-key="${p}"]`);
+		}
+	});
+}

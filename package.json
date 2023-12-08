@@ -7,7 +7,14 @@
 	"dependencies": {
 		"todomvc-app-css": "^2.0.0"
 	},
+	"devDependencies": {
+		"@m-ld/m-ld": "^0.10.0",
+		"immer": "^10.0.3",
+		"memory-level": "^1.0.0",
+		"rxjs": "^7.8.1"
+	},
 	"dependenciesComments": {
-		"todomvc-app-css": "TodoMVC boilerplate CSS (not in use, just copy/pasted into css/index.css)"
+		"todomvc-app-css": "TodoMVC boilerplate CSS (not in use, just copy/pasted into css/index.css)",
+		"*": "Dev node module dependencies are loaded from CDN, see import map in index.html"
 	}
 }
