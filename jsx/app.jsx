@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {useDocumentLocationHash, useObservableValue} from "./hooks";
-import {watchQuery, watchSubject} from "../js/query";
+import {watchQuery, watchSubject} from "@m-ld/m-ld/ext/rx";
 import {map, NEVER} from "rxjs";
 import {matches, processHash} from "../js/helpers";
 import {initModel} from "../js/model";
