@@ -18,54 +18,53 @@
 		<script type="module" src="./js/app.js"></script>
 	</head>
 	<body>
-		<section class="todoapp" data-key="app">
+		<section class="todoapp" id="app">
 			<header class="header">
 				<h1><a href=".">todos</a></h1>
-				<progress max="100" data-key="progress" style="width: 100%;">Loading...</progress>
+				<progress max="100" id="progress" style="width: 100%;">Loading...</progress>
 				<input
 					placeholder="What needs to be done?"
 					autofocus
 					class="new-todo"
-					data-key="new"
+					id="new"
 					disabled
 				/>
 			</header>
 			<!-- This section should be hidden by default and shown when there are todos -->
-			<section class="main" data-key="main">
+			<section class="main" id="main">
 				<input
 					id="toggle-all"
 					class="toggle-all"
 					type="checkbox"
-					data-key="toggle-all"
 				/>
 				<label for="toggle-all">Mark all as complete</label>
-				<ul class="todo-list" data-key="list">
-					<template data-key="todo-template">
-						<li data-key="todo">
+				<ul class="todo-list" id="list">
+					<template id="todo-template">
+						<li id="todo">
 							<div class="view">
-								<input data-key="toggle" class="toggle" type="checkbox">
-								<label data-key="label"></label>
-								<button class="destroy" data-key="destroy"></button>
+								<input id="toggle" class="toggle" type="checkbox">
+								<label id="label"></label>
+								<button class="destroy" id="destroy"></button>
 							</div>
-							<input class="edit" data-key="edit">
+							<input class="edit" id="edit">
 						</li>
 					</template>
 				</ul>
 			</section>
 			<!-- This footer should be hidden by default and shown when there are todos -->
-			<footer class="footer" data-key="footer">
+			<footer class="footer" id="footer">
 				<!-- This should be `0 items left` by default -->
-				<span class="todo-count" data-key="count">
+				<span class="todo-count" id="count">
 					<strong>0</strong> items left
 				</span>
 				<!-- Remove this if you don't implement routing -->
-				<ul class="filters" data-key="filters">
+				<ul class="filters" id="filters">
 					<li><a href="#//" class="selected">All</a></li>
 					<li><a href="#//active">Active</a></li>
 					<li><a href="#//completed">Completed</a></li>
 				</ul>
 				<!-- Hidden if no completed items are left ↓ -->
-				<button class="clear-completed" data-key="clear-completed">
+				<button class="clear-completed" id="clear-completed">
 					Clear completed
 				</button>
 			</footer>

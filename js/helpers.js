@@ -38,16 +38,3 @@ export const replaceHTML = (el, html) => {
 	el.replaceChildren();
 	el.insertAdjacentHTML("afterbegin", html);
 };
-
-/**
- * @template T
- * @param {T} root
- * @returns {{[key: string]: Element | T}}
- */
-export function keyedElements(root) {
-	return new Proxy({self: root}, {
-		get(t, p) {
-			return t[p] ??= root.querySelector(`[data-key="${p}"]`);
-		}
-	});
-}
