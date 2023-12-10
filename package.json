@@ -8,10 +8,8 @@
 		"todomvc-app-css": "^2.0.0"
 	},
 	"devDependencies": {
-		"@m-ld/m-ld": "^0.10.0",
-		"immer": "^10.0.3",
-		"memory-level": "^1.0.0",
-		"rxjs": "^7.8.1"
+		"@m-ld/m-ld": "^0.10.1-edge.0",
+		"memory-level": "^1.0.0"
 	},
 	"dependenciesComments": {
 		"todomvc-app-css": "TodoMVC boilerplate CSS (not in use, just copy/pasted into css/index.css)",

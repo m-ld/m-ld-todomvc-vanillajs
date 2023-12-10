@@ -1,6 +1,6 @@
 import {getAppLocation, matches, processHash, replaceHTML} from "./helpers.js";
 import {initModel} from "./model.js";
-import {watchQuery, watchSubject} from "./query.js";
+import {watchQuery, watchSubject} from "@m-ld/m-ld/ext/rx";
 
 class Todo {
 	/**@type HTMLLIElement*/li;
@@ -79,7 +79,7 @@ class Todo {
 export default new class App {
 	/**@type string*/filter;
 	/**@type string*/modelId;
-	/**@type MeldClone*/model;
+	/**@type {import('@m-ld/m-ld').MeldClone}*/model;
 	/**@type {{'@id': string, completed: boolean}[]}*/summary;
 	/**@type Todo[]*/todos = [];
 
